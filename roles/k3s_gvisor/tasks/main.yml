@@ -1,0 +1,5 @@
+---
+
+- name: Deploy gvisor ptrace Runtime CRI
+  include_tasks: gvisor.yml
+  when: vars['k3s_gvisor_install']

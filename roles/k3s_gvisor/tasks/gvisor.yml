@@ -1,0 +1,45 @@
+---
+
+- name: Save original config.toml 
+  stat: path=/var/lib/rancher/k3s/agent/etc/containerd/config.toml
+  register: config_toml
+
+- name: Move config.toml to config.toml.tmpl
+  command: mv /var/lib/rancher/k3s/agent/etc/containerd/config.toml /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+  when: config_toml.stat.exists
+
+- name: Download gvisor runsc
+  get_url:
+    url: https://storage.googleapis.com/gvisor/releases/release/{{ k3s_gvisor_version }}/{{ ansible_facts.architecture }}/runsc
+    dest: /usr/local/bin/runsc
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Download gvisor containerd-shim
+  get_url:
+    url: https://storage.googleapis.com/gvisor/releases/release/{{ k3s_gvisor_version }}/{{ ansible_facts.architecture }}/containerd-shim-runsc-v1
+    dest: /usr/local/bin/containerd-shim-runsc-v1
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Insert/Update configuration block in /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+  ansible.builtin.blockinfile:
+    path: /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+    insertbefore: '^\[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc\]$'
+    block: |
+      disabled_plugins = ["restart"]
+      
+      [plugins."io.containerd.runtime.v1.linux"]
+        shim_debug = true
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+        runtime_type = "io.containerd.runsc.v1"
+
+- name: Reload and Restart K3s service
+  systemd:
+    name: k3s-node
+    daemon_reload: yes
+    state: restarted
+    enabled: yes
