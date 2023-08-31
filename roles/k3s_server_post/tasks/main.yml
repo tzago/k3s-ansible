@@ -2,7 +2,27 @@
 - name: Deploy metallb pool
   include_tasks: metallb.yml
 
-- name: Remove tmp directory used for manifests
+- name: Get contents of manifests folder
+  find:
+    paths: /var/lib/rancher/k3s/server/manifests
+    file_type: file
+  register: k3s_server_manifests
+  when: ansible_hostname == hostvars[groups['master'][0]]['ansible_hostname']
+
+- name: Get sub dirs of manifests folder
+  find:
+    paths: /var/lib/rancher/k3s/server/manifests
+    file_type: directory
+  register: k3s_server_manifests_directories
+  when: ansible_hostname == hostvars[groups['master'][0]]['ansible_hostname']
+
+- name: Remove manifests and folders that are only needed for bootstrapping cluster so k3s doesn't auto apply on start
   file:
-    path: /tmp/k3s
+    path: "{{ item.path }}"
     state: absent
+  with_items:
+    - "{{ k3s_server_manifests.files }}"
+    - "{{ k3s_server_manifests_directories.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: ansible_hostname == hostvars[groups['master'][0]]['ansible_hostname']

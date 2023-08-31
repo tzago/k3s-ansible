@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: trusted
+  name: www-runc
+spec:
+  containers:
+  - image: nginx:1.18
+    name: www
+    ports:
+    - containerPort: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: untrusted
+  name: www-gvisor
+spec:
+  runtimeClassName: gvisor
+  containers:
+  - image: nginx:1.18
+    name: www
+    ports:
+    - containerPort: 80

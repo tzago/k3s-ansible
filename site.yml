@@ -38,3 +38,9 @@
   roles:
     - role: k3s_server_post
       become: true
+
+- name: Install and Configure Gvisor CRI
+  hosts: node
+  roles:
+    - role: k3s_gvisor
+      become: true

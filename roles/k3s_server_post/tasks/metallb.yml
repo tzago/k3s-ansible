@@ -1,30 +1,14 @@
 ---
-- name: Create manifests directory for temp configuration
-  file:
-    path: /tmp/k3s
-    state: directory
-    owner: "{{ ansible_user_id }}"
-    mode: 0755
-  with_items: "{{ groups[group_name_master | default('master')] }}"
-  run_once: true
-
-- name: Copy metallb CRs manifest to first master
-  template:
-    src: "metallb.crs.j2"
-    dest: "/tmp/k3s/metallb-crs.yaml"
-    owner: "{{ ansible_user_id }}"
-    mode: 0755
-  with_items: "{{ groups[group_name_master | default('master')] }}"
-  run_once: true
 
 - name: Test metallb-system namespace
   command: >-
     k3s kubectl -n metallb-system
   changed_when: false
-  with_items: "{{ groups[group_name_master | default('master')] }}"
+  with_items: "{{ groups['master'] }}"
   run_once: true
+  delay: 120
 
-- name: Wait for MetalLB resources
+- name: Wait for MetalLB resources. Be patient this task can take up to 30min ...
   command: >-
     k3s kubectl wait {{ item.resource }}
     --namespace='metallb-system'
@@ -32,8 +16,11 @@
     {% if item.selector | default(False) -%}--selector='{{ item.selector }}'{%- endif %}
     {% if item.condition | default(False) -%}{{ item.condition }}{%- endif %}
     --timeout='{{ metal_lb_available_timeout }}'
+  register: lsresult
+  until: "lsresult is not failed"
+  retries: "{{ retry_count | default(40) }}"    
+  delay: 45 
   changed_when: false
-  run_once: true
   with_items:
     - description: controller
       resource: deployment
@@ -66,24 +53,36 @@
   command: >-
     k3s kubectl -n metallb-system get endpoints webhook-service
   changed_when: false
-  with_items: "{{ groups[group_name_master | default('master')] }}"
+  with_items: "{{ groups['master'] }}"
   run_once: true
+  delay: 120 
 
-- name: Apply metallb CRs
-  command: >-
-    k3s kubectl apply -f /tmp/k3s/metallb-crs.yaml
-    --timeout='{{ metal_lb_available_timeout }}'
-  register: this
-  changed_when: false
-  run_once: true
-  until: this.rc == 0
-  retries: 5
+- name: Create manifests directory on first master
+  file:
+    path: /var/lib/rancher/k3s/server/manifests
+    state: directory
+    owner: root
+    group: root
+    mode: 0644
+  when: ansible_hostname == hostvars[groups['master'][0]]['ansible_hostname']
+
+- name: Copy metallb CRs manifest to first master
+  template:
+    src: "metallb.crs.j2"
+    dest: "/var/lib/rancher/k3s/server/manifests/metallb-crs.yaml"
+    owner: root
+    group: root
+    mode: 0644
+  when: ansible_hostname == hostvars[groups['master'][0]]['ansible_hostname']
 
 - name: Test metallb-system resources for Layer 2 configuration
   command: >-
     k3s kubectl -n metallb-system get {{ item }}
   changed_when: false
-  run_once: true
+  register: lsresult
+  until: lsresult.rc == 0 and (lsresult.stdout | length) > 0  
+  retries: "{{ retry_count | default(40) }}"
+  delay: 10
   when: metal_lb_mode == "layer2"
   with_items:
     - IPAddressPool
@@ -93,7 +92,10 @@
   command: >-
     k3s kubectl -n metallb-system get {{ item }}
   changed_when: false
-  run_once: true
+  register: lsresult
+  until: lsresult.rc == 0 and (lsresult.stdout | length) > 0  
+  retries: "{{ retry_count | default(40) }}"
+  delay: 10
   when: metal_lb_mode == "bgp"
   with_items:
     - IPAddressPool
