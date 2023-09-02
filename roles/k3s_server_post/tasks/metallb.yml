@@ -8,7 +8,7 @@
   run_once: true
   delay: 120
 
-- name: Wait for MetalLB resources. Be patient this task can take up to 30min ...
+- name: Wait for MetalLB resources. This task can take up to 30min when Calico CNI is on ...
   command: >-
     k3s kubectl wait {{ item.resource }}
     --namespace='metallb-system'
@@ -52,6 +52,10 @@
 - name: Test metallb-system webhook-service endpoint
   command: >-
     k3s kubectl -n metallb-system get endpoints webhook-service
+  register: lsresult
+  until: "lsresult is not failed"
+  retries: "{{ retry_count | default(40) }}"    
+  delay: 45 
   changed_when: false
   with_items: "{{ groups['master'] }}"
   run_once: true

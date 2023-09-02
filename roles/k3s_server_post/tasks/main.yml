@@ -1,6 +1,7 @@
 ---
 - name: Deploy metallb pool
   include_tasks: metallb.yml
+  when: ansible_hostname == hostvars[groups['master'][0]]['ansible_hostname']
 
 - name: Get contents of manifests folder
   find:

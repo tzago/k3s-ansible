@@ -12,8 +12,8 @@ system_timezone: "Your/Timezone"
 host_iface: "eth0"
 
 #Make sure to pick only one CNI at a time. Enable the CNI of your preference below.
-cni_calico: true
-cni_flannel: false
+cni_calico: false
+cni_flannel: true
 
 #This parameter is only relevant if you enabled the Calico CNI above.
 cni_calico_version: "v3.26.1"
