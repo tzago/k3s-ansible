@@ -59,7 +59,6 @@
   changed_when: false
   with_items: "{{ groups['master'] }}"
   run_once: true
-  delay: 120 
 
 - name: Create manifests directory on first master
   file:
